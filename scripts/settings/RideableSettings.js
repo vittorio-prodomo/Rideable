@@ -253,6 +253,17 @@ Hooks.once("init", () => {  // game.settings.get(cModuleName, "")
 	config: true,
 	type: Boolean,
 	default: false
+  });
+
+  //FORK PATCH (T99) — see RideableCompatibility.js. dnd5e-only, because the creature-occupancy
+  //rule it relaxes is a dnd5e system rule; there is no core constrain option for it.
+  game.settings.register(cModuleName, "RidersIgnoreCreatures", {
+	name: Translate("Settings.RidersIgnoreCreatures.name"),
+	hint: Translate("Settings.RidersIgnoreCreatures.descrp"),
+	scope: "world",
+	config: game.system.id === "dnd5e",
+	type: Boolean,
+	default: false
   });  
   
   let vChoices = {};

@@ -194,6 +194,10 @@
 				"name"					: "Stop grapple on effect removal",
 				"descrp"				: "If a token should be released as soon as the grapple effect is removed"
 			},
+			"RidersIgnoreCreatures" : {
+				"name"					: "Riders ignore creature collision",
+				"descrp"				: "When Rideable repositions a rider (including a grappled token), let it pass through squares occupied by other creatures. Without this, a single token standing in the computed path silently leaves the rider behind. Walls are already ignored for riders; this brings creatures in line."
+			},
 			
 			"GrappleplacementDefault" : {
 				"name"					: "Grapple placement default",

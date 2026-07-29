@@ -150,6 +150,10 @@
 				"name": "Interrompi presa alla rimozione dell'effetto",
 				"descrp": "Se un token deve essere rilasciato non appena l'effetto di presa viene rimosso"
 			},
+			"RidersIgnoreCreatures": {
+				"name": "I passeggeri ignorano la collisione con le creature",
+				"descrp": "Quando Rideable riposiziona un passeggero (incluso un token afferrato), gli permette di attraversare caselle occupate da altre creature. Senza questa opzione, un solo token sul percorso calcolato lascia indietro il passeggero senza alcun avviso. I muri sono già ignorati per i passeggeri; questa opzione allinea le creature."
+			},
 			"GrappleplacementDefault": {
 				"name": "Posizionamento predefinito della presa",
 				"descrp": "Il posizionamento standard dei token afferrati",

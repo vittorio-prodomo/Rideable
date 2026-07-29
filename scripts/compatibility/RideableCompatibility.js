@@ -32,6 +32,8 @@ class RideableCompatibility {
 	
 	//specific: wall-heights
 	static onWHTokenupdate(pToken, pchanges, pInfos) {} //only called if cWallHeight is active and a token updates, handels HWTokenheight updates for riders
+
+	static ridersIgnoreCreatures() {} //FORK PATCH (T99) returns if riders should ignore creature occupancy when repositioned
 	
 	//specific: tagger
 	static onTGGTokenpreupdate(pToken, pchanges, pInfos) {} //only called if cTagger is active and a token updates, handels tagger updates for ridden 
@@ -233,7 +235,18 @@ class RideableCompatibility {
 		return vCreatedTokens;
 	} 
 	
-	//specific: wall-heights	
+	//FORK PATCH (T99) — defensive read: if the setting is somehow not registered yet, behave exactly
+	//as upstream (creatures block) rather than silently relaxing collision.
+	static ridersIgnoreCreatures() {
+		try {
+			return game.settings.get(cModuleName, "RidersIgnoreCreatures") === true;
+		}
+		catch (vError) {
+			return false;
+		}
+	}
+
+	//specific: wall-heights
 	static onWHTokenupdate(pToken, pchanges, pInfos) {
 		if (game.user.isGM) {			
 			//Check if vToken is ridden
@@ -295,6 +308,10 @@ export { RequestRideableTeleport };
 Hooks.once("init", async () => {
 	
 	if (game.system.id == cDnD5e) {
+		//NOTE (fork, T99): these two hook registrations are DEAD CODE while Rideable is active —
+		//the vClass.isOccupiedGridSpace* assignments below replace dnd5e's own methods, which are
+		//what fire these hooks. Verified live: zero calls during a blocked rider move. The
+		//riders-ignore-creatures patch therefore lives in vRideablegetRelevantOccupyingTokens.
 		Hooks.on("dnd5e.determineOccupiedGridSpaceBlocking", (vGridSpace, vToken, vOptions, vFound) => {
 			vFound.forEach(vtoTest => {
 				if (RideableFlags.RidingConnection(vToken.document, vtoTest.document)) vFound.delete(vtoTest);
@@ -313,6 +330,22 @@ Hooks.once("init", async () => {
 		let vRideablegetRelevantOccupyingTokens = (gridSpace, token, { preview=false }={}) => {
 			const grid = canvas.grid;
 			if ( grid.isGridless ) return [];
+
+			//FORK PATCH (T99, 2026-07-29) — "riders ignore creature collision".
+			//A rider is repositioned BY Rideable, not by its own volition: placeTokenrotated issues a
+			//real move() for it whenever the ridden token moves. dnd5e's occupancy rule then blocks
+			//that path on any third-party creature standing in it, and the refusal is SILENT — move()
+			//returns false, throws nothing, logs nothing — so the rider is simply left behind. For a
+			//GRAPPLED rider that is a dead end, because OnTokenpreupdate also forbids moving it by
+			//hand ("Still grappled by X"), leaving release-and-re-grapple as the only recovery.
+			//Patched HERE, not on dnd5e's determineOccupiedGridSpace* hooks: this function replaces
+			//dnd5e's own, so while Rideable is active those hooks never fire and patching them is
+			//dead code (verified live — zero hook calls during a blocked rider move).
+			//Returning [] disables both blocking AND difficult terrain for the rider, which is what we
+			//want: it is being carried, not walking. Note walls are ALREADY ignored for riders
+			//(constrainOptions.ignoreWalls), so this only brings creatures in line with them.
+			if (RideableCompatibility.ridersIgnoreCreatures() && RideableFlags.isRider(token.document)) return [];
+
 			const topLeft = grid.getTopLeftPoint(gridSpace);
 			const rect = new PIXI.Rectangle(topLeft.x, topLeft.y, grid.sizeX, grid.sizeY);
 			const lowerElevation = gridSpace.k * grid.distance;
