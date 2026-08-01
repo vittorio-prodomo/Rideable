@@ -198,7 +198,11 @@
 				"name"					: "Riders ignore creature collision",
 				"descrp"				: "When Rideable repositions a rider (including a grappled token), let it pass through squares occupied by other creatures. Without this, a single token standing in the computed path silently leaves the rider behind. Walls are already ignored for riders; this brings creatures in line."
 			},
-			
+			"GrappleDragCost" : {
+				"name"					: "Dragging a grappled creature costs extra movement",
+				"descrp"				: "Applies the 2024 Grappled rule: every foot the grappler moves costs 1 extra foot while it drags a grappled creature, unless that creature is Tiny or two or more sizes smaller than it. The extra cost stacks with difficult terrain. Only the cost is affected — movement is never blocked."
+			},
+
 			"GrappleplacementDefault" : {
 				"name"					: "Grapple placement default",
 				"descrp"				: "The standard grapple placement of tokens",

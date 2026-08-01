@@ -154,6 +154,10 @@
 				"name": "I passeggeri ignorano la collisione con le creature",
 				"descrp": "Quando Rideable riposiziona un passeggero (incluso un token afferrato), gli permette di attraversare caselle occupate da altre creature. Senza questa opzione, un solo token sul percorso calcolato lascia indietro il passeggero senza alcun avviso. I muri sono già ignorati per i passeggeri; questa opzione allinea le creature."
 			},
+			"GrappleDragCost": {
+				"name": "Trascinare una creatura afferrata costa movimento extra",
+				"descrp": "Applica la regola Afferrato del 2024: ogni piede di movimento costa 1 piede extra a chi afferra mentre trascina una creatura afferrata, a meno che questa non sia Minuscola o di due o più taglie inferiori. Il costo extra si somma a quello del terreno difficile. Viene modificato solo il costo: il movimento non viene mai bloccato."
+			},
 			"GrappleplacementDefault": {
 				"name": "Posizionamento predefinito della presa",
 				"descrp": "Il posizionamento standard dei token afferrati",

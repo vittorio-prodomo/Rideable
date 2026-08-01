@@ -34,7 +34,11 @@ class RideableCompatibility {
 	static onWHTokenupdate(pToken, pchanges, pInfos) {} //only called if cWallHeight is active and a token updates, handels HWTokenheight updates for riders
 
 	static ridersIgnoreCreatures() {} //FORK PATCH (T99) returns if riders should ignore creature occupancy when repositioned
-	
+
+	static grappleDragCost() {} //FORK PATCH (T96) returns if dragging a grappled creature should cost extra movement
+
+	static grappleDragSurchargeApplies(pMoverDocument) {} //FORK PATCH (T96) returns if pMoverDocument is dragging at least one non-exempt grappled rider
+
 	//specific: tagger
 	static onTGGTokenpreupdate(pToken, pchanges, pInfos) {} //only called if cTagger is active and a token updates, handels tagger updates for ridden 
 	//IMPLEMENTATIONS
@@ -244,6 +248,43 @@ class RideableCompatibility {
 		catch (vError) {
 			return false;
 		}
+	}
+
+	//FORK PATCH (T96) — same defensive read as above: an unregistered setting must read as "off", so
+	//that a load-order accident cannot silently double everyone's movement cost.
+	static grappleDragCost() {
+		try {
+			return game.settings.get(cModuleName, "GrappleDragCost") === true;
+		}
+		catch (vError) {
+			return false;
+		}
+	}
+
+	//FORK PATCH (T96) — pure predicate, no settings reads and no canvas state: does pMoverDocument
+	//currently drag at least one grappled rider that the size clause does NOT exempt?
+	//2024 Grappled/Movable: "...every foot of movement costs it 1 extra foot unless you are Tiny or
+	//two or more sizes smaller than it." Note the surcharge is a flat +1 foot per foot regardless of
+	//how many creatures are being dragged — the clause is not per-captive — so this is an existential
+	//quantifier, not a sum.
+	static grappleDragSurchargeApplies(pMoverDocument) {
+		if (!pMoverDocument) return false;
+
+		const vMoverSize = dnd5eNumericalSize(pMoverDocument);
+
+		if (vMoverSize === null) return false;
+
+		return RideableFlags.RiderTokens(pMoverDocument).some(vRider => {
+			if (!RideableFlags.isGrappled(vRider)) return false; //willing riders and mounts never surcharge
+
+			const vRiderSize = dnd5eNumericalSize(vRider);
+
+			if (vRiderSize === null) return false; //tiles and actorless tokens can ride; they are not creatures
+
+			if (vRiderSize === 0) return false; //Tiny
+
+			return (vMoverSize - vRiderSize) < 2; //two or more sizes smaller is exempt
+		});
 	}
 
 	//specific: wall-heights
@@ -474,6 +515,81 @@ Hooks.once("init", async () => {
 		isRider
 	};
 });
+
+//FORK PATCH (T96, 2026-08-01) — the 2024 "Grappled / Movable" movement surcharge.
+//
+//RAW: "The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra
+//foot unless you are Tiny or two or more sizes smaller than it." Rideable models the drag and NO
+//movement cost whatsoever (measured live 2026-07-29: dragging a Small goblin 25 ft cost 25 ft), so the
+//surcharge is ours.
+//
+//WHY HERE. Token#_getMovementCostFunction is the single site every measurement of the mover's path runs
+//through — the drag ruler's cost label, dnd5e's speed-based ruler colouring, and core's recorded
+//_movementHistory costs (client/documents/token.mjs:1336 measures via this.object when rendered). One
+//wrapper therefore covers every movement action (walk/swim/fly/crawl); patching each
+//CONFIG.Token.movement.actions[*].getCostFunction instead would be N sites that dnd5e reassigns
+//wholesale, and any future action would silently escape.
+//
+//WHY A WRAPPER, NOT A REPLACEMENT. dnd5e overrides this method to add its own occupied-space surcharge,
+//and its body is exactly our shape (`return cost + distance`, dnd5e.mjs:70643). Copying that body into a
+//replacement — Rideable's house style for isOccupiedGridSpaceBlocking — would fork dnd5e's terrain logic
+//into this repo where it rots on the next system update, and is the same "the override wins" trap that
+//fork patch #1 (T99) documented. Wrapping OUTSIDE dnd5e's override also makes the stacking decision
+//(Vittorio, 2026-08-01) fall out for free: we add our foot to whatever dnd5e computed, so dragging
+//across difficult terrain costs 3 ft per foot (1 base + 1 terrain + 1 drag). dnd5e's own non-stacking
+//bail applies to difficult terrain compounding with itself; the Grappled clause is not terrain.
+//
+//WHY setup, NOT init. dnd5e assigns CONFIG.Token.objectClass = Token5e inside its OWN init hook
+//(dnd5e.mjs:82401), so registering at init would depend on system-vs-module hook ordering. This method
+//is looked up dynamically on every measurement, so the "register at init or the placeable never sees
+//it" rule for input handlers (MouseInteractionManager captures those by reference at draw time) does
+//not apply here.
+Hooks.once("setup", () => {
+	if (game.system.id != cDnD5e) return;
+
+	const vTokenClass = CONFIG.Token?.objectClass;
+
+	if (!vTokenClass?.prototype?._getMovementCostFunction) return;
+
+	const vPatch = function (pWrapped, pOptions) {
+		const vCostFunction = pWrapped(pOptions);
+
+		if (!RideableCompatibility.grappleDragCost()) return vCostFunction;
+
+		//mirror the gate dnd5e puts on its own cost layer: if the GM turned movement automation off
+		//entirely, this must not be the one thing still editing their numbers
+		if (game.settings.get("dnd5e", "movementAutomation") === "none") return vCostFunction;
+
+		if (!RideableCompatibility.grappleDragSurchargeApplies(this.document)) return vCostFunction;
+
+		//"every foot of movement costs it 1 extra foot"
+		return (pFrom, pTo, pDistance, pSegment) => vCostFunction(pFrom, pTo, pDistance, pSegment) + pDistance;
+	};
+
+	//libWrapper when available, manual wrap otherwise — Rideable does not declare libWrapper as a
+	//dependency, and a silently absent patch is worse than a slightly longer registration.
+	if (game.modules.get("lib-wrapper")?.active) {
+		libWrapper.register(cModuleName, "CONFIG.Token.objectClass.prototype._getMovementCostFunction", vPatch, "WRAPPER");
+	}
+	else {
+		const vOriginal = vTokenClass.prototype._getMovementCostFunction;
+
+		vTokenClass.prototype._getMovementCostFunction = function (pOptions) {
+			return vPatch.call(this, pInnerOptions => vOriginal.call(this, pInnerOptions), pOptions);
+		};
+	}
+});
+
+//FORK PATCH (T96) — dnd5e's numeric size ladder (Tiny = 0, Small = 1, Medium = 2, ...), matching the
+//?? 2 fallback the system itself uses for an unknown size key. Returns null when the document has no
+//actor at all: Rideable lets tiles and actorless tokens ride, and those are not creatures.
+function dnd5eNumericalSize(pDocument) {
+	const vSize = pDocument?.actor?.system?.traits?.size;
+
+	if (!vSize) return null;
+
+	return CONFIG.DND5E?.actorSizes?.[vSize]?.numerical ?? 2;
+}
 
 Hooks.once("setupTileActions", (pMATT) => {
 	if (RideableCompUtils.isactiveModule(cMATT)) {

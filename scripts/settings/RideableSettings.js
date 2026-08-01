@@ -264,8 +264,21 @@ Hooks.once("init", () => {  // game.settings.get(cModuleName, "")
 	config: game.system.id === "dnd5e",
 	type: Boolean,
 	default: false
-  });  
-  
+  });
+
+  //FORK PATCH (T96) — see RideableCompatibility.js. dnd5e-only: the 2024 "Grappled/Movable" clause
+  //("every foot of movement costs it 1 extra foot") is a dnd5e rule, and the surcharge is applied on
+  //top of dnd5e's own movement cost function. Default off — upstream ships system-agnostic and must
+  //not start editing anyone's movement numbers on upgrade.
+  game.settings.register(cModuleName, "GrappleDragCost", {
+	name: Translate("Settings.GrappleDragCost.name"),
+	hint: Translate("Settings.GrappleDragCost.descrp"),
+	scope: "world",
+	config: game.system.id === "dnd5e",
+	type: Boolean,
+	default: false
+  });
+
   let vChoices = {};
   
   for (let i = 0; i < cGrapplePlacements.length; i++) {
