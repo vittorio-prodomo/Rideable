@@ -704,7 +704,7 @@ class MountingManager {
 			
 			pData[i].flags[cModuleName]["RidersFlag"] = vRiderReplacement.map(vToken => vToken.id);
 			
-			vRidden = await canvas.scene.createEmbeddedDocuments(Token.embeddedName, [pData[i]], { RideableSpawn: true});
+			vRidden = await canvas.scene.createEmbeddedDocuments("Token", [pData[i]], { RideableSpawn: true});
 			
 			UpdateRidderTokens(vRidden[0]);
 			
@@ -812,7 +812,7 @@ class MountingManager {
 	static ProxyTarget(pOptions = {}) {
 		let vLayer = canvas.activeLayer;
 		
-		if (vLayer instanceof TokenLayer) {
+		if (vLayer instanceof foundry.canvas.layers.TokenLayer) {
 			let vHovered = vLayer.hover;
 					
 			if (vHovered && !vHovered.document.isSecret) {
