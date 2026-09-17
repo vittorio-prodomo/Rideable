@@ -216,9 +216,9 @@ class RideableCompatibility {
 				}					
 
 				// remove selected tokens from current scene (keep remaining tokens)
-				if (pDeleteOld) await pSourceScene.deleteEmbeddedDocuments(Token.embeddedName, vValidTokenIDs, { isUndo: true, RideableSpawn: true});
+				if (pDeleteOld) await pSourceScene.deleteEmbeddedDocuments("Token", vValidTokenIDs, { isUndo: true, RideableSpawn: true});
 				// add selected tokens to target scene
-				vCreatedTokens = await pTargetScene.createEmbeddedDocuments(Token.embeddedName, vselectedTokensData, { isUndo: true, RideableSpawn: true});
+				vCreatedTokens = await pTargetScene.createEmbeddedDocuments("Token", vselectedTokensData, { isUndo: true, RideableSpawn: true});
 				
 				
 				for (let i = 0; i < vselectedTokensData.length; i++) {
@@ -365,7 +365,7 @@ Hooks.once("init", async () => {
 			});
 		});
 		
-		let vClass = Canvas.layers.tokens.layerClass.prototype;
+		let vClass = foundry.canvas.Canvas.layers.tokens.layerClass.prototype; // fork: the bare `Canvas` global is deprecated since v13
 		
 		//the following code is modified based on https://github.com/foundryvtt/dnd5e/blob/5.1.x/module/canvas/layers/tokens.mjs
 		let vRideablegetRelevantOccupyingTokens = (gridSpace, token, { preview=false }={}) => {
