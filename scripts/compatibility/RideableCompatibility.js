@@ -424,7 +424,15 @@ Hooks.once("init", async () => {
 			const tokenSize = CONFIG.DND5E.actorSizes[token.actor?.system.traits?.size]?.numerical ?? 2;
 			const modernRules = game.settings.get("dnd5e", "rulesVersion") === "modern";
 			const halflingNimbleness = token.actor?.getFlag("dnd5e", "halflingNimbleness");
-			return found.some(t => {
+			//FORK PATCH (T235, 2026-10-05) — honour the system's contract. This function REPLACES
+			//dnd5e's own, which ends by firing `dnd5e.determineOccupiedGridSpaceBlocking` with the
+			//set of blockers so that modules can edit it; the replacement dropped that call, so
+			//with Rideable active NO module could exempt a token from blocking (found when an owned
+			//module's handler for incorporeal summons never ran — zero hook calls). Build the same
+			//Set and fire the hook, exactly as dnd5e 5.3 does. It also revives the handler
+			//registered at the top of this block, which agrees with the rule already applied in
+			//vRideablegetRelevantOccupyingTokens.
+			const blockers = new Set(Array.from(found).filter(t => {
 				// Only creatures block movement.
 				if ( !t.actor?.system.isCreature ) return false;
 
@@ -443,7 +451,14 @@ Hooks.once("init", async () => {
 
 				// A size difference of less than 2 should block
 				return Math.abs(tokenSize - occupiedSize) < 2;
-		});
+		}));
+			Hooks.callAll("dnd5e.determineOccupiedGridSpaceBlocking", gridSpace, token, { preview }, blockers);
+			return blockers.size > 0;
+
+		//NOTE (fork): everything from here to this function's closing brace is UNREACHABLE — upstream's
+		//brace sits after the assignment below, so isOccupiedGridSpaceDifficult is never replaced and
+		//dnd5e's own (which fires its hook) stays in force. Left as found; fixing the brace would
+		//change behaviour for riders.
 		
 		vClass.isOccupiedGridSpaceDifficult = (gridSpace, token, { preview=false }={}) => {
 			const found = vRideablegetRelevantOccupyingTokens(gridSpace, token, { preview });
