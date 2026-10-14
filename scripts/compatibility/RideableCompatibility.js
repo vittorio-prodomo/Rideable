@@ -442,7 +442,12 @@ Hooks.once("init", async () => {
 				// If creature has any statuses that should never block movement, don't block movement
 				if ( t.actor.statuses.intersects(CONFIG.DND5E.neverBlockStatuses) ) return false;
 
-				const occupiedSize = CONFIG.DND5E.actorSizes[t.actor.system.traits.size]?.numerical ?? 2;
+				//FORK PATCH (2026-10-14) — size a SWARM by its members, exactly as dnd5e 5.3's own check
+				//does (`details.type.swarm || traits.size`). A swarm "can occupy another creature's space and
+				//vice versa" (2024 Swarm trait): a Medium swarm of Tiny rats must be passable like a Tiny
+				//creature. This copy read only `traits.size`, so every swarm blocked. (Its space stays Difficult
+				//Terrain: dnd5e's own Difficult check, still in force, sizes it as the whole swarm.)
+				const occupiedSize = CONFIG.DND5E.actorSizes[t.actor.system.details?.type?.swarm || t.actor.system.traits.size]?.numerical ?? 2;
 				// In modern rules, Tiny creatures can be moved through
 				if ( modernRules && (occupiedSize === 0) ) return false;
 
